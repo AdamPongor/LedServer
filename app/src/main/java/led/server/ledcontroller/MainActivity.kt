@@ -86,7 +86,7 @@ fun MainScaffold(modifier: Modifier = Modifier) {
                     Text(stringResource(id = R.string.app_name))
                 },
                 actions = {
-                    IconButton(modifier = Modifier.fillMaxHeight(), onClick = { dialogState.value = true},) {
+                    IconButton(modifier = Modifier.fillMaxHeight(), onClick = { dialogState.value = true}) {
                         Icon(
                             modifier = Modifier.fillMaxHeight(),
                             imageVector = Icons.Outlined.List,
@@ -216,16 +216,16 @@ fun GreetingPreview() {
 @Composable
 fun WaveFunction(speed: MutableFloatState, amp0: MutableFloatState, amp1: MutableFloatState, wave: MutableFloatState){
     Column {
-        ParamSlider(speed, 0f, 300f, "speed")
-        ParamRangeSlider(amp0, amp1, 0f, 255f, "amp0", "amp1")
-        ParamSlider(wave, 0f, 2000f, "wave")
+        ParamSlider(speed, 0f, 300f, "speed", R.drawable.time)
+        ParamRangeSlider(amp0, amp1, 0f, 255f, "amp0", "amp1", R.drawable.amplitude)
+        ParamSlider(wave, 0f, 2000f, "wave", R.drawable.wavelength)
     }
 }
 
 @Composable
 fun PulseFunction(speed: MutableFloatState, amp0: MutableFloatState, amp1: MutableFloatState){
     Column {
-        ParamSlider(speed, 0f, 300f, "speed")
-        ParamRangeSlider(amp0, amp1, 0f, 255f, "amp0", "amp1")
+        ParamSlider(speed, 0f, 300f, "speed", R.drawable.time)
+        ParamRangeSlider(amp0, amp1, 0f, 255f, "amp0", "amp1", R.drawable.amplitude)
     }
 }
