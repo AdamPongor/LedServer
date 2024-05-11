@@ -3,14 +3,18 @@ package led.server.ledcontroller
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.FavoriteBorder
@@ -20,6 +24,7 @@ import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -27,6 +32,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults.topAppBarColors
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.MutableFloatState
+import androidx.compose.runtime.MutableIntState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
@@ -38,6 +44,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
@@ -195,11 +203,14 @@ fun Content(modifier: Modifier = Modifier, lightMode: Int){
         val amp0Value = remember { mutableFloatStateOf(0f) }
         val amp1Value = remember { mutableFloatStateOf(255f) }
         val waveValue = remember { mutableFloatStateOf(0f) }
+        val stepsValue = remember { mutableFloatStateOf(20f) }
+        val fadeIndex = remember { mutableIntStateOf(0) }
 
         when(lightMode){
             0 -> WaveFunction(speedValue, amp0Value, amp1Value, waveValue)
             1 -> {}
             2 -> PulseFunction(speedValue, amp0Value, amp1Value)
+            3 -> FadeFunction(stepsValue, fadeIndex)
             else -> {}
         }
     }
@@ -227,5 +238,58 @@ fun PulseFunction(speed: MutableFloatState, amp0: MutableFloatState, amp1: Mutab
     Column {
         ParamSlider(speed, 0f, 300f, "speed", R.drawable.time)
         ParamRangeSlider(amp0, amp1, 0f, 255f, "amp0", "amp1", R.drawable.amplitude)
+    }
+}
+
+@Composable
+fun FadeFunction(steps: MutableFloatState, index: MutableIntState){
+    Column{
+        ParamSlider(initialValue = steps, min = 1f, max = 200f, paramName = "steps", iconID = R.drawable.time)
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .selectable(
+                    selected = (index.intValue == 0),
+                    onClick = {
+                        index.intValue = 0
+                    }),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            RadioButton(
+                selected = (index.intValue == 0),
+                onClick = { index.intValue = 0 }
+            )
+            Spacer(Modifier.padding(horizontal = 10.dp))
+            Text(
+                text = "Rainbow"
+            )
+            Image(
+                modifier = Modifier.height(30.dp).padding(horizontal = 10.dp).clip(shape = RoundedCornerShape(5.dp)),
+                painter = painterResource(id = R.drawable.rainbow_gradient_fully_saturated),
+                contentScale = ContentScale.FillWidth,
+                contentDescription = "rainbow"
+            )
+        }
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .selectable(
+                    selected = (index.intValue == 1),
+                    enabled = false,
+                    onClick = {
+                        index.intValue = 1
+                    }),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            RadioButton(
+                selected = (index.intValue == 1),
+                onClick = { index.intValue = 1 },
+                enabled = false
+            )
+            Spacer(Modifier.padding(horizontal = 10.dp))
+            Text(
+                text = "Custom"
+            )
+        }
     }
 }

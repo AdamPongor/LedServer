@@ -82,7 +82,7 @@ fun ParamSlider(initialValue: MutableFloatState, min: Float, max: Float, paramNa
             contentDescription = "paramIcon"
         )
         Spacer(Modifier.padding(horizontal = 10.dp))
-        Column(){
+        Column(verticalArrangement = Arrangement.Center){
             Slider(
                 value = sliderPosition,
                 valueRange = min..max,
