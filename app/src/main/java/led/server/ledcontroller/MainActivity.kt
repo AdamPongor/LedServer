@@ -1,10 +1,14 @@
 package led.server.ledcontroller
 
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -14,12 +18,15 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.outlined.List
+import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -36,6 +43,7 @@ import androidx.compose.runtime.MutableIntState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -44,6 +52,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -59,9 +68,13 @@ import com.github.skydoves.colorpicker.compose.rememberColorPickerController
 import kotlinx.coroutines.launch
 import led.server.ledcontroller.controls.ParamRangeSlider
 import led.server.ledcontroller.controls.ParamSlider
+import led.server.ledcontroller.ui.ColorSelectDialog
 import led.server.ledcontroller.ui.SingleSelectDialog
+import led.server.ledcontroller.ui.colorDialogState
 import led.server.ledcontroller.ui.dialogState
 import led.server.ledcontroller.ui.theme.LedControllerTheme
+import okhttp3.internal.toHexString
+import okhttp3.internal.trimSubstring
 
 
 class MainActivity : ComponentActivity() {
@@ -172,7 +185,8 @@ fun Content(modifier: Modifier = Modifier, lightMode: Int){
                         res = Update(param("color", c))
                     }
                 }
-            }
+            },
+
         )
         BrightnessSlider(
             modifier = Modifier
@@ -241,55 +255,166 @@ fun PulseFunction(speed: MutableFloatState, amp0: MutableFloatState, amp1: Mutab
     }
 }
 
+@OptIn(ExperimentalStdlibApi::class)
 @Composable
-fun FadeFunction(steps: MutableFloatState, index: MutableIntState){
-    Column{
+fun FadeFunction(steps: MutableFloatState, fadeIndex: MutableIntState){
+
+    var colors = remember { mutableStateListOf( Color.Red, Color.Black) }
+    val rainbow = mutableListOf(Color.Red, Color.Yellow, Color.Green, Color.Cyan, Color.Blue, Color.Magenta)
+    var selectedIndex = remember { mutableIntStateOf(0) }
+
+    val coroutineScope = rememberCoroutineScope()
+
+    Column(){
         ParamSlider(initialValue = steps, min = 1f, max = 200f, paramName = "steps", iconID = R.drawable.time)
         Row(
             Modifier
                 .fillMaxWidth()
                 .selectable(
-                    selected = (index.intValue == 0),
+                    selected = (fadeIndex.intValue == 0),
                     onClick = {
-                        index.intValue = 0
+                        fadeIndex.intValue = 0
+                        coroutineScope.launch {
+                            Update(param("gradient", parseGradient(rainbow)))
+                        }
                     }),
             verticalAlignment = Alignment.CenterVertically
         ) {
             RadioButton(
-                selected = (index.intValue == 0),
-                onClick = { index.intValue = 0 }
+                selected = (fadeIndex.intValue == 0),
+                onClick = {
+                    fadeIndex.intValue = 0
+                    coroutineScope.launch {
+                        Update(param("gradient", parseGradient(rainbow)))
+                    }
+                }
             )
             Spacer(Modifier.padding(horizontal = 10.dp))
             Text(
                 text = "Rainbow"
             )
             Image(
-                modifier = Modifier.height(30.dp).padding(horizontal = 10.dp).clip(shape = RoundedCornerShape(5.dp)),
+                modifier = Modifier
+                    .height(40.dp)
+                    .padding(horizontal = 10.dp)
+                    .clip(shape = RoundedCornerShape(5.dp)),
                 painter = painterResource(id = R.drawable.rainbow_gradient_fully_saturated),
                 contentScale = ContentScale.FillWidth,
                 contentDescription = "rainbow"
             )
         }
+
         Row(
             Modifier
                 .fillMaxWidth()
                 .selectable(
-                    selected = (index.intValue == 1),
-                    enabled = false,
+                    selected = (fadeIndex.intValue == 1),
                     onClick = {
-                        index.intValue = 1
+                        fadeIndex.intValue = 1
+                        coroutineScope.launch {
+                            Update(param("gradient", parseGradient(colors)))
+                        }
                     }),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             RadioButton(
-                selected = (index.intValue == 1),
-                onClick = { index.intValue = 1 },
-                enabled = false
+                selected = (fadeIndex.intValue == 1),
+                onClick = {
+                    fadeIndex.intValue = 1
+                    coroutineScope.launch {
+                        Update(param("gradient", parseGradient(colors)))
+                    }
+                },
             )
             Spacer(Modifier.padding(horizontal = 10.dp))
             Text(
                 text = "Custom"
             )
         }
+        LazyColumn(modifier = Modifier.fillMaxHeight()) {
+            items(colors.size) {index ->
+                Row(Modifier.padding(10.dp),
+                    verticalAlignment = Alignment.CenterVertically)
+                {
+                    Text(
+                        text = "#" + colors[index].toArgb().toHexString().trimSubstring(2, 8).uppercase(),
+                        color = colors[index]
+                        )
+                    Spacer(Modifier.padding(horizontal = 10.dp))
+                    Box(modifier = Modifier
+                        .fillMaxWidth(0.8f)
+                        .height(40.dp)
+                        .clip(shape = RoundedCornerShape(5.dp))
+                        .background(colors[index])
+                        .clickable {
+                            selectedIndex.intValue = index
+                            colorDialogState.value = true
+                        }
+                    )
+                    Spacer(Modifier.padding(horizontal = 10.dp))
+                    FilledIconButton(
+                        modifier = Modifier.size(40.dp),
+                        shape = RoundedCornerShape(5.dp),
+                        enabled = (colors.size > 2),
+                        onClick = {
+                            if (colors.size > 2){
+                                fadeIndex.intValue = 1
+                                colors.removeAt(index)
+                                coroutineScope.launch {
+                                    Update(param("gradient", parseGradient(colors)))
+                                }
+                            }
+                    }){
+                        Icon(painter = painterResource(id = R.drawable.twotone_delete_outline_24), contentDescription = "Delete")
+                    }
+                }
+                if(index == colors.size-1 && colors.size < 10){
+                    Button(
+                        modifier = Modifier.fillMaxWidth().padding(10.dp),
+                        shape = RoundedCornerShape(5.dp),
+                        onClick = {
+                            fadeIndex.intValue = 1
+                            if(colors.size < 10){
+                                colors.add(Color.White)
+                                coroutineScope.launch {
+                                    Update(param("gradient", parseGradient(colors)))
+                                }
+                            }
+                        }
+                    ){
+                        Icon(painter = painterResource(id = R.drawable.baseline_add_24), contentDescription = "Add")
+                    }
+                }
+            }
+
+        }
+
+        if (colorDialogState.value){
+            ColorSelectDialog(
+                initialColor = colors[selectedIndex.intValue],
+                onSubmitButtonClick = {
+                    color ->
+                    fadeIndex.intValue = 1
+                    colors[selectedIndex.intValue] = color
+                    coroutineScope.launch {
+                        Update(param("gradient", parseGradient(colors)))
+                    }
+                }
+            )
+
+        }
     }
+}
+
+fun parseGradient(colors: MutableList<Color>): String{
+    val builder = StringBuilder()
+
+    builder.append("${colors.size}:")
+
+    colors.forEach { c ->
+        builder.append("${c.toArgb().toHexString().trimSubstring(2, 8).uppercase()},")
+    }
+
+    Log.d("xdd", builder.trimEnd(',').toString() )
+    return builder.trimEnd(',').toString()
 }
