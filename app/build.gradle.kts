@@ -67,4 +67,9 @@ dependencies {
     implementation("com.github.skydoves:colorpicker-compose:1.0.7")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.6.2")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    //datastore
+    implementation("androidx.datastore:datastore-preferences:1.1.1")
+    //navigation
+    val nav_version = "2.7.7"
+    implementation("androidx.navigation:navigation-compose:$nav_version")
 }

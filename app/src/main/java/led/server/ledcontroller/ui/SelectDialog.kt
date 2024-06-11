@@ -29,8 +29,6 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
-import led.server.ledcontroller.Functions
-import led.server.ledcontroller.LightingType
 
 val dialogState by lazy { mutableStateOf(false) }
 

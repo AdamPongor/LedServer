@@ -4,6 +4,12 @@ import android.os.Bundle
 import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -19,11 +25,14 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.FavoriteBorder
-import androidx.compose.material.icons.outlined.List
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.outlined.Menu
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledIconButton
@@ -38,8 +47,10 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults.topAppBarColors
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableFloatState
 import androidx.compose.runtime.MutableIntState
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
@@ -47,6 +58,8 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.mapSaver
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -54,28 +67,40 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.github.skydoves.colorpicker.compose.AlphaTile
-import com.github.skydoves.colorpicker.compose.BrightnessSlider
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
 import com.github.skydoves.colorpicker.compose.ColorEnvelope
-import com.github.skydoves.colorpicker.compose.HsvColorPicker
+import com.github.skydoves.colorpicker.compose.ColorPickerController
 import com.github.skydoves.colorpicker.compose.rememberColorPickerController
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import led.server.ledcontroller.backend.Settings
+import led.server.ledcontroller.backend.Settings.Companion.NUM_LEDS
+import led.server.ledcontroller.backend.Settings.Companion.URL_KEY
+import led.server.ledcontroller.backend.Update
+import led.server.ledcontroller.backend.param
+import led.server.ledcontroller.controls.ColorPicker
 import led.server.ledcontroller.controls.ParamRangeSlider
 import led.server.ledcontroller.controls.ParamSlider
 import led.server.ledcontroller.ui.ColorSelectDialog
+import led.server.ledcontroller.ui.Functions
+import led.server.ledcontroller.ui.SettingsScreen
 import led.server.ledcontroller.ui.SingleSelectDialog
 import led.server.ledcontroller.ui.colorDialogState
 import led.server.ledcontroller.ui.dialogState
 import led.server.ledcontroller.ui.theme.LedControllerTheme
 import okhttp3.internal.toHexString
 import okhttp3.internal.trimSubstring
-
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -84,7 +109,21 @@ class MainActivity : ComponentActivity() {
             LedControllerTheme {
                 // A surface container using the 'background' color from the theme
                 Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-                    MainScaffold()
+                    val navController = rememberNavController()
+
+                    NavHost(
+                        navController = navController,
+                        startDestination = "mainscaffold",
+                        enterTransition = { slideInHorizontally(initialOffsetX = {it}) },
+                        exitTransition = { slideOutHorizontally() + fadeOut() },
+                        popEnterTransition = { slideInHorizontally() + fadeIn(animationSpec = spring(stiffness = -Spring.StiffnessMediumLow)) },
+                        popExitTransition = { slideOutHorizontally(targetOffsetX = {it}) }
+
+                    ) {
+                        composable("mainscaffold") { MainScaffold({ navController.navigate("settings") }) }
+                        composable("settings") { SettingsScreen { navController.popBackStack() } }
+                    }
+                    //MainScaffold()
                 }
             }
         }
@@ -93,8 +132,8 @@ class MainActivity : ComponentActivity() {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MainScaffold(modifier: Modifier = Modifier) {
-    var lightMode by remember { mutableIntStateOf(0) }
+fun MainScaffold(onSettings: () -> Unit, modifier: Modifier = Modifier) {
+    var lightMode by rememberSaveable { mutableIntStateOf(0) }
 
     Scaffold(
         topBar = {
@@ -106,11 +145,21 @@ fun MainScaffold(modifier: Modifier = Modifier) {
                 title = {
                     Text(stringResource(id = R.string.app_name))
                 },
-                actions = {
+                navigationIcon = {
                     IconButton(modifier = Modifier.fillMaxHeight(), onClick = { dialogState.value = true}) {
                         Icon(
                             modifier = Modifier.fillMaxHeight(),
-                            imageVector = Icons.Outlined.List,
+                            imageVector = Icons.Outlined.Menu,
+                            contentDescription = "lighting type"
+                        )
+                    }
+                },
+                actions = {
+
+                    IconButton(modifier = Modifier.fillMaxHeight(), onClick = onSettings) {
+                        Icon(
+                            modifier = Modifier.fillMaxHeight(),
+                            imageVector = Icons.Default.Settings,
                             contentDescription = "lighting type"
                         )
                     }
@@ -136,6 +185,8 @@ fun MainScaffold(modifier: Modifier = Modifier) {
             }
         }
     ) { innerPadding ->
+
+        val coroutineScope = rememberCoroutineScope()
         Column(
             modifier = Modifier
                 .padding(innerPadding),
@@ -147,84 +198,85 @@ fun MainScaffold(modifier: Modifier = Modifier) {
                 .align(Alignment.CenterHorizontally), fontWeight = FontWeight.Medium, fontSize = 25.sp)
             Content(modifier.padding(innerPadding), lightMode)
         }
-        SingleSelectDialog("Lighting mode", Functions, lightMode, onSubmitButtonClick = {value -> lightMode = value; Update(param("program", lightMode)) })
+        val settings = Settings(LocalContext.current)
+        SingleSelectDialog("Lighting mode", Functions, lightMode, onSubmitButtonClick = { value ->
+            lightMode = value
+            coroutineScope.launch {
+                val URL = settings.getAccessToken(URL_KEY).stateIn(CoroutineScope(Dispatchers.IO)).value ?: ""
+                Update(param("program", lightMode), URL = URL)
+            }
+
+         })
     }
+}
+val ColorSaver = run {
+    val redKey = "Red"
+    val greenKey = "Green"
+    val blueKey = "Blue"
+    mapSaver(
+        save = { mapOf(redKey to it.red, greenKey to it.green, blueKey to it.blue) },
+        restore = {
+            Color(
+                red = it[redKey] as Float,
+                green = it[greenKey] as Float,
+                blue = it[blueKey] as Float
+            )
+        }
+    )
 }
 
 @Composable
 fun Content(modifier: Modifier = Modifier, lightMode: Int){
     //https://github.com/skydoves/colorpicker-compose
+
+    var color = Color.Black
     val controller = rememberColorPickerController()
 
-    controller.setWheelColor(Color.Black)
-    controller.setWheelAlpha(0.5f)
-    controller.setDebounceDuration(100)
-
-    var c by remember {mutableStateOf("black xd")}
-    var res by remember {mutableStateOf("black xd")}
-    var color by remember { mutableStateOf(Color.Black) }
-
+    val settings = Settings(LocalContext.current)
+    val res = rememberSaveable { mutableStateOf("") }
     val coroutineScope = rememberCoroutineScope()
 
     Column(
         verticalArrangement = Arrangement.Top,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        HsvColorPicker(
-            modifier = Modifier
-                .fillMaxWidth()
-                .fillMaxHeight(0.4f)
-                .padding(10.dp),
-            controller = controller,
-            onColorChanged = { colorEnvelope: ColorEnvelope ->
-                color = colorEnvelope.color // ARGB color value.
-                //val hexCode: String = colorEnvelope.hexCode
-                c = colorEnvelope.hexCode.removePrefix("FF")
-                if (colorEnvelope.fromUser){
-                    coroutineScope.launch {
-                        res = Update(param("color", c))
-                    }
+
+        when (lightMode){
+
+            0, 1, 2 ->{
+                SideEffect{
+                    Log.d("xddd", color.toArgb().toHexString())
                 }
-            },
+                ColorPicker (
+                    initialColor = color,
+                    controller = controller,
+                    onColorChanged = { colorEnvelope: ColorEnvelope ->
+                        color = colorEnvelope.color // ARGB color value.
+                        //val hexCode: String = colorEnvelope.hexCode
+                        val c = colorEnvelope.hexCode.removePrefix("FF")
+                        if (colorEnvelope.fromUser) {
+                            coroutineScope.launch {
+                                val URL = settings.getAccessToken(URL_KEY).stateIn(CoroutineScope(Dispatchers.IO)).value ?: ""
+                                res.value = Update(param("color", c),URL = URL)
+                            }
+                        }
+                    }
+                )
+            }
+        }
 
-        )
-        BrightnessSlider(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(10.dp)
-                .padding(bottom = 0.dp)
-                .height(30.dp),
-            controller = controller,
-            //wheelImageBitmap = ImageBitmap.imageResource(R.drawable.baseline_fingerprint_24)
-        )
-
-        Text(
-            text = "# $c",
-            modifier = Modifier
-                .padding(10.dp)
-                .padding(top = 0.dp),
-            color = color
-        )
-
-        AlphaTile(
-            modifier = Modifier
-                .size(80.dp)
-                .clip(RoundedCornerShape(6.dp)),
-            controller = controller
-        )
-
-        val speedValue = remember { mutableFloatStateOf(0f) }
-        val amp0Value = remember { mutableFloatStateOf(0f) }
-        val amp1Value = remember { mutableFloatStateOf(255f) }
-        val waveValue = remember { mutableFloatStateOf(0f) }
-        val stepsValue = remember { mutableFloatStateOf(20f) }
-        val fadeIndex = remember { mutableIntStateOf(0) }
+        val speedValue = rememberSaveable { mutableFloatStateOf(0f) }
+        val amp0Value = rememberSaveable { mutableFloatStateOf(0f) }
+        val amp1Value = rememberSaveable { mutableFloatStateOf(255f) }
+        val waveValue = rememberSaveable { mutableFloatStateOf(5f) }
+        val stepsValue = rememberSaveable { mutableFloatStateOf(20f) }
+        val fadeIndex = rememberSaveable { mutableIntStateOf(0) }
 
         when(lightMode){
             0 -> WaveFunction(speedValue, amp0Value, amp1Value, waveValue)
-            1 -> {}
+            1 -> SolidFunction(controller)
             2 -> PulseFunction(speedValue, amp0Value, amp1Value)
-            3 -> FadeFunction(stepsValue, fadeIndex)
+            3 -> FadeFunction(stepsValue, fadeIndex, settings)
             else -> {}
         }
     }
@@ -234,16 +286,23 @@ fun Content(modifier: Modifier = Modifier, lightMode: Int){
 @Composable
 fun GreetingPreview() {
     LedControllerTheme {
-        MainScaffold()
+        MainScaffold({})
     }
 }
 
 @Composable
 fun WaveFunction(speed: MutableFloatState, amp0: MutableFloatState, amp1: MutableFloatState, wave: MutableFloatState){
+    val settings = Settings(LocalContext.current)
+    val coroutineScope = rememberCoroutineScope()
+    val maxNum = remember { mutableStateOf(0) }
+    LaunchedEffect(Unit){
+            maxNum.value = settings.getAccessToken(NUM_LEDS).stateIn(CoroutineScope(Dispatchers.IO)).value ?: 0
+
+    }
     Column {
         ParamSlider(speed, 0f, 300f, "speed", R.drawable.time)
         ParamRangeSlider(amp0, amp1, 0f, 255f, "amp0", "amp1", R.drawable.amplitude)
-        ParamSlider(wave, 0f, 2000f, "wave", R.drawable.wavelength)
+        ParamSlider(wave, 0f, (maxNum.value *2 ).toFloat(), "wave", R.drawable.wavelength)
     }
 }
 
@@ -255,17 +314,42 @@ fun PulseFunction(speed: MutableFloatState, amp0: MutableFloatState, amp1: Mutab
     }
 }
 
-@OptIn(ExperimentalStdlibApi::class)
 @Composable
-fun FadeFunction(steps: MutableFloatState, fadeIndex: MutableIntState){
+fun SolidFunction(controller: ColorPickerController){
 
-    var colors = remember { mutableStateListOf( Color.Red, Color.Black) }
+    val colors = listOf(Color.Red, Color.Green, Color.Blue, Color.White,
+                        Color.Magenta, Color.Yellow, Color.Cyan, Color.Black,
+                        Color(255, 100, 0), Color(80, 255, 0), Color(0, 255, 80), Color(128, 0, 255)
+    )
+
+    LazyVerticalGrid(
+        modifier = Modifier.padding(10.dp),
+        columns = GridCells.Adaptive(minSize = 80.dp),
+
+    ){
+        items(colors.size) { index ->
+            Box(
+                modifier = Modifier
+                    .size(95.dp)
+                    .padding(10.dp)
+                    .background(color = colors[index], RoundedCornerShape(6.dp))
+                    .clickable {
+                        controller.selectByColor(colors[index], true)
+                    },
+            )
+        }
+    }
+}
+
+@Composable
+fun FadeFunction(steps: MutableFloatState, fadeIndex: MutableIntState, settings: Settings){
+
+    val colors = remember { mutableStateListOf( Color.Red, Color.Black) }
     val rainbow = mutableListOf(Color.Red, Color.Yellow, Color.Green, Color.Cyan, Color.Blue, Color.Magenta)
-    var selectedIndex = remember { mutableIntStateOf(0) }
-
+    val selectedIndex = remember { mutableIntStateOf(0) }
     val coroutineScope = rememberCoroutineScope()
 
-    Column(){
+    Column{
         ParamSlider(initialValue = steps, min = 1f, max = 200f, paramName = "steps", iconID = R.drawable.time)
         Row(
             Modifier
@@ -275,7 +359,11 @@ fun FadeFunction(steps: MutableFloatState, fadeIndex: MutableIntState){
                     onClick = {
                         fadeIndex.intValue = 0
                         coroutineScope.launch {
-                            Update(param("gradient", parseGradient(rainbow)))
+                            val URL =
+                                settings
+                                    .getAccessToken(URL_KEY)
+                                    .stateIn(CoroutineScope(Dispatchers.IO)).value ?: ""
+                            Update(param("gradient", parseGradient(rainbow)), URL = URL)
                         }
                     }),
             verticalAlignment = Alignment.CenterVertically
@@ -285,7 +373,8 @@ fun FadeFunction(steps: MutableFloatState, fadeIndex: MutableIntState){
                 onClick = {
                     fadeIndex.intValue = 0
                     coroutineScope.launch {
-                        Update(param("gradient", parseGradient(rainbow)))
+                        val URL = settings.getAccessToken(URL_KEY).stateIn(CoroutineScope(Dispatchers.IO)).value ?: ""
+                        Update(param("gradient", parseGradient(rainbow)), URL = URL)
                     }
                 }
             )
@@ -312,7 +401,11 @@ fun FadeFunction(steps: MutableFloatState, fadeIndex: MutableIntState){
                     onClick = {
                         fadeIndex.intValue = 1
                         coroutineScope.launch {
-                            Update(param("gradient", parseGradient(colors)))
+                            val URL =
+                                settings
+                                    .getAccessToken(URL_KEY)
+                                    .stateIn(CoroutineScope(Dispatchers.IO)).value ?: ""
+                            Update(param("gradient", parseGradient(colors)), URL = URL)
                         }
                     }),
             verticalAlignment = Alignment.CenterVertically,
@@ -322,7 +415,8 @@ fun FadeFunction(steps: MutableFloatState, fadeIndex: MutableIntState){
                 onClick = {
                     fadeIndex.intValue = 1
                     coroutineScope.launch {
-                        Update(param("gradient", parseGradient(colors)))
+                        val URL = settings.getAccessToken(URL_KEY).stateIn(CoroutineScope(Dispatchers.IO)).value ?: ""
+                        Update(param("gradient", parseGradient(colors)), URL = URL)
                     }
                 },
             )
@@ -361,7 +455,8 @@ fun FadeFunction(steps: MutableFloatState, fadeIndex: MutableIntState){
                                 fadeIndex.intValue = 1
                                 colors.removeAt(index)
                                 coroutineScope.launch {
-                                    Update(param("gradient", parseGradient(colors)))
+                                    val URL = settings.getAccessToken(URL_KEY).stateIn(CoroutineScope(Dispatchers.IO)).value ?: ""
+                                    Update(param("gradient", parseGradient(colors)), URL = URL)
                                 }
                             }
                     }){
@@ -370,14 +465,17 @@ fun FadeFunction(steps: MutableFloatState, fadeIndex: MutableIntState){
                 }
                 if(index == colors.size-1 && colors.size < 10){
                     Button(
-                        modifier = Modifier.fillMaxWidth().padding(10.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(10.dp),
                         shape = RoundedCornerShape(5.dp),
                         onClick = {
                             fadeIndex.intValue = 1
                             if(colors.size < 10){
                                 colors.add(Color.White)
                                 coroutineScope.launch {
-                                    Update(param("gradient", parseGradient(colors)))
+                                    val URL = settings.getAccessToken(URL_KEY).stateIn(CoroutineScope(Dispatchers.IO)).value ?: ""
+                                    Update(param("gradient", parseGradient(colors)), URL = URL)
                                 }
                             }
                         }
@@ -397,7 +495,8 @@ fun FadeFunction(steps: MutableFloatState, fadeIndex: MutableIntState){
                     fadeIndex.intValue = 1
                     colors[selectedIndex.intValue] = color
                     coroutineScope.launch {
-                        Update(param("gradient", parseGradient(colors)))
+                        val URL = settings.getAccessToken(URL_KEY).stateIn(CoroutineScope(Dispatchers.IO)).value ?: ""
+                        Update(param("gradient", parseGradient(colors)), URL = URL)
                     }
                 }
             )

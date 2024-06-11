@@ -1,4 +1,4 @@
-package led.server.ledcontroller
+package led.server.ledcontroller.backend
 
 import android.util.Log
 import okhttp3.Call
@@ -9,14 +9,16 @@ import okhttp3.Response
 
 private val client = OkHttpClient()
 
-var URL = "http://192.168.50.74/";
+//var URL = "192.168.50.74";
 
 data class param (
     val name: String,
     val value: Any
 )
 
-fun Update(vararg p: param) : String {
+fun Update(vararg p: param, URL: String) : String {
+
+    //val URL = settings.getAccessToken.stateIn(CoroutineScope(Dispatchers.IO)).value
 
     val builder = StringBuilder()
 
@@ -26,7 +28,7 @@ fun Update(vararg p: param) : String {
 
     var res = ""
     val request: Request = Request.Builder()
-        .url("$URL?${builder}")
+        .url("http://$URL/?${builder}")
         .build()
 
     client.newCall(request).enqueue(object: Callback {

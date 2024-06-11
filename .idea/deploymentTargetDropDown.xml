@@ -24,10 +24,13 @@
       <entry key="DialogPreview (1)">
         <State />
       </entry>
-      <entry key="RangeSliderExample">
+      <entry key="app">
         <State />
       </entry>
-      <entry key="app">
+      <entry key="xdPreview">
+        <State />
+      </entry>
+      <entry key="xdSolid">
         <State />
       </entry>
     </value>

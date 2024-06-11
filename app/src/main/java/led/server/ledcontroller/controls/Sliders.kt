@@ -19,19 +19,28 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
-import led.server.ledcontroller.Update
-import led.server.ledcontroller.param
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
+import led.server.ledcontroller.backend.Settings
+import led.server.ledcontroller.backend.Update
+import led.server.ledcontroller.backend.param
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ParamRangeSlider(initialMinValue: MutableFloatState, initialMaxValue: MutableFloatState, min: Float, max: Float, paramName1: String, paramName2: String, iconID: Int) {
 
     var sliderPosition by remember { mutableStateOf(initialMinValue.floatValue..initialMaxValue.floatValue) }
+    val settings = Settings(LocalContext.current)
+    val coroutineScope = rememberCoroutineScope()
 
     Row( modifier = Modifier.padding(horizontal = 10.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -54,7 +63,11 @@ fun ParamRangeSlider(initialMinValue: MutableFloatState, initialMaxValue: Mutabl
                 },
                 valueRange = min..max,
                 onValueChangeFinished = {
-                    Update(param(paramName1, sliderPosition.start.toInt()), param(paramName2, sliderPosition.endInclusive.toInt()))
+                    coroutineScope.launch {
+                        val URL = settings.getAccessToken(Settings.URL_KEY).stateIn(CoroutineScope(Dispatchers.IO)).value ?: ""
+                        Update(param(paramName1, sliderPosition.start.toInt()), param(paramName2, sliderPosition.endInclusive.toInt()), URL = URL)
+                    }
+
                 },
                 track = {
                         SliderPositions -> SliderDefaults.Track(sliderPositions = SliderPositions)
@@ -73,6 +86,8 @@ fun ParamRangeSlider(initialMinValue: MutableFloatState, initialMaxValue: Mutabl
 @Composable
 fun ParamSlider(initialValue: MutableFloatState, min: Float, max: Float, paramName: String, iconID: Int) {
     var sliderPosition by remember { mutableFloatStateOf(initialValue.floatValue) }
+    val settings = Settings(LocalContext.current)
+    val coroutineScope = rememberCoroutineScope()
     Row(Modifier.padding(horizontal = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -91,7 +106,11 @@ fun ParamSlider(initialValue: MutableFloatState, min: Float, max: Float, paramNa
                     initialValue.floatValue = sliderPosition
                 },
                 onValueChangeFinished = {
-                    Update(param(paramName, sliderPosition.toInt()))
+                    coroutineScope.launch{
+                        val URL = settings.getAccessToken(Settings.URL_KEY).stateIn(CoroutineScope(Dispatchers.IO)).value ?: ""
+                        Update(param(paramName, sliderPosition.toInt()), URL = URL)
+                    }
+
                 },
                 track = {
                         SliderPositions -> SliderDefaults.Track(sliderPositions = SliderPositions)
