@@ -70,12 +70,15 @@ fun SettingsScreen(onBack: () -> Unit){
         val settings = Settings(LocalContext.current)
         val tokenText = settings.getAccessToken(Settings.URL_KEY).collectAsState(initial = "")
         val ledNumValue = remember { mutableStateOf(TextFieldValue(text = "0", selection = TextRange(1))) }
+        val ledRefRate = remember { mutableStateOf(TextFieldValue(text = "50", selection = TextRange(2))) }
         val ipTokenValue = remember { mutableStateOf("") }
 
         LaunchedEffect(Unit) {
             ipTokenValue.value = settings.getAccessToken(Settings.URL_KEY).stateIn(CoroutineScope(Dispatchers.IO)).value ?: ""
             val intText = settings.getAccessToken(Settings.NUM_LEDS).stateIn(CoroutineScope(Dispatchers.IO)).value ?: 0
             ledNumValue.value = TextFieldValue(text = intText.toString(), TextRange(intText.toString().length))
+            val refRateText = settings.getAccessToken(Settings.LED_REF_RATE).stateIn(CoroutineScope(Dispatchers.IO)).value ?: 50
+            ledRefRate.value = TextFieldValue(text = refRateText.toString(), TextRange(refRateText.toString().length))
         }
 
         Column(modifier = Modifier
@@ -151,6 +154,36 @@ fun SettingsScreen(onBack: () -> Unit){
                         }
                     },
                     label = { Text("Number of LEDs") },
+                    visualTransformation = VisualTransformation.None,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                )
+
+                OutlinedTextField(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(10.dp),
+                    value = ledRefRate.value,
+                    onValueChange = {
+                        try {
+                            val intValue = if (it.text.isEmpty()){
+                                0
+                            } else {
+                                it.text.toInt()
+                            }
+
+                            if (intValue >= 0){
+                                ledRefRate.value = TextFieldValue(text = intValue.toString(), TextRange(intValue.toString().length))
+                                CoroutineScope(Dispatchers.IO).launch {
+                                    settings.saveToken(Settings.LED_REF_RATE, intValue)
+                                }
+                            }
+
+                        }
+                        catch(e: Exception){
+
+                        }
+                    },
+                    label = { Text("LED refresh rate") },
                     visualTransformation = VisualTransformation.None,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
                 )

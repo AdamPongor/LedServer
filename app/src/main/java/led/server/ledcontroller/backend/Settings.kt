@@ -16,6 +16,7 @@ class Settings(private val context: Context) {
         private val Context.dataStore: DataStore<Preferences> by preferencesDataStore("userToken")
         val URL_KEY = stringPreferencesKey("URL_KEY")
         val NUM_LEDS = intPreferencesKey("NUM_LEDS_KEY")
+        val LED_REF_RATE = intPreferencesKey("REF_RATE_KEY")
     }
 
     fun <T> getAccessToken(key: Preferences.Key<T>): Flow<T?> {

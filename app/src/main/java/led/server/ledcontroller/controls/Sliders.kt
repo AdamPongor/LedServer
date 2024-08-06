@@ -36,7 +36,7 @@ import led.server.ledcontroller.backend.param
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ParamRangeSlider(initialMinValue: MutableFloatState, initialMaxValue: MutableFloatState, min: Float, max: Float, paramName1: String, paramName2: String, iconID: Int) {
+fun ParamRangeSlider(initialMinValue: MutableFloatState, initialMaxValue: MutableFloatState, min: Float, max: Float, paramName1: String, paramName2: String, iconID: Int, unit : String = "") {
 
     var sliderPosition by remember { mutableStateOf(initialMinValue.floatValue..initialMaxValue.floatValue) }
     val settings = Settings(LocalContext.current)
@@ -74,8 +74,8 @@ fun ParamRangeSlider(initialMinValue: MutableFloatState, initialMaxValue: Mutabl
                 }
             )
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween){
-                Text(text = sliderPosition.start.toInt().toString())
-                Text(text = sliderPosition.endInclusive.toInt().toString())
+                Text(text = sliderPosition.start.toInt().toString() + unit)
+                Text(text = sliderPosition.endInclusive.toInt().toString() + unit)
             }
         }
 
@@ -84,7 +84,7 @@ fun ParamRangeSlider(initialMinValue: MutableFloatState, initialMaxValue: Mutabl
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ParamSlider(initialValue: MutableFloatState, min: Float, max: Float, paramName: String, iconID: Int) {
+fun ParamSlider(initialValue: MutableFloatState, min: Float, max: Float, paramName: String, iconID: Int, unit : String = "") {
     var sliderPosition by remember { mutableFloatStateOf(initialValue.floatValue) }
     val settings = Settings(LocalContext.current)
     val coroutineScope = rememberCoroutineScope()
@@ -116,7 +116,7 @@ fun ParamSlider(initialValue: MutableFloatState, min: Float, max: Float, paramNa
                         SliderPositions -> SliderDefaults.Track(sliderPositions = SliderPositions)
                 }
             )
-            Text(text = sliderPosition.toInt().toString())
+            Text(text = sliderPosition.toInt().toString() + unit)
         }
     }
 }
